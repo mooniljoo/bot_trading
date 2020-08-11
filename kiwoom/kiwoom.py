@@ -12,10 +12,17 @@ class Kiwoom(QAxWidget):
         self.login_next_loop = None
         #############################
 
+        ######## 변수 모음
+        self.account_num = None
+        self.user_id = None
+        self.user_name = None
+        #############################
+
         self.get_ocx_instance()
         self.event_slots()
 
         self.signal_login_commConnect()
+        self.get_account_info()
 
     def get_ocx_instance(self):
         # 키움OpenAPI 프로그램 레지스트리 등록
@@ -41,3 +48,14 @@ class Kiwoom(QAxWidget):
         print(Exception(errCode))
 
         self.login_event_loop.exit()
+
+    def get_account_info(self):
+        account_list = self.dynamicCall("GetLoginInfo(String)","ACCNO")
+        self.account_num = account_list.split(";")[0]
+        print("나의 보유 계좌번호 : %s " % self.account_num)
+
+        self.user_id = self.dynamicCall("GetLoginInfo(String)", "USER_ID")
+        print("아이디  %s " % self.user_id)
+
+        self.user_name = self.dynamicCall("GetLoginInfo(String)", "USER_NAME")
+        print("이름 : %s " % self.user_name)
