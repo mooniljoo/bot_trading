@@ -10,6 +10,8 @@ class Kiwoom(QAxWidget):
 
         ######## eventloop 모듈
         self.login_next_loop = None
+        self.detail_account_info_event_loop = None
+        self.detail_account_info_event_loop_2 = None
         #############################
 
         ######## 변수 모음
@@ -18,16 +20,13 @@ class Kiwoom(QAxWidget):
         self.user_name = None
         #############################
 
-        ######## 이벤트루프 모음
-        self.detail_account_info_event_loop = None
-        #############################
-
         self.get_ocx_instance()
         self.event_slots()
 
         self.signal_login_commConnect()
         self.get_account_info()
         self.detail_account_info()
+        self.detail_account_mystock()
 
     def get_ocx_instance(self):
         # 키움OpenAPI 프로그램 레지스트리 등록
@@ -83,6 +82,20 @@ class Kiwoom(QAxWidget):
         self.detail_account_info_event_loop =QEventLoop()
         self.detail_account_info_event_loop.exec()
 
+    def detail_account_mystock(self, sPrevNext="0"):
+        #계좌평가잔고내역요청
+        print("---- 계좌평가잔고내역을 요청하는 부분 ----")
+        self.dynamicCall("SetInputValue(String, String)", "계좌번호", self.account_num)
+        self.dynamicCall("SetInputValue(String, String)", "비밀번호", "0000")
+        self.dynamicCall("SetInputValue(String, String)", "비밀번호입력매체구분", "00")
+        self.dynamicCall("SetInputValue(String, String)", "조회구분", "2")
+        # Open API 조회 함수를 호출해서 전문을 서버로 전송
+        self.dynamicCall("CommRqData(String, String, int, String)","계좌평가잔고내역요청","opw00018",sPrevNext, "2000")
+
+        # Event Loop 동시성 처리
+        self.detail_account_info_event_loop_2 = QEventLoop()
+        self.detail_account_info_event_loop_2.exec()
+
     def trdata_slot(self, sScrNo, sRQName, sTrCode, sRecordName, sPrevNext):
         '''
         tr 요청을 받는 구역, 슬롯.
@@ -103,3 +116,13 @@ class Kiwoom(QAxWidget):
 
             # Event Loop 동시성 처리
             self.detail_account_info_event_loop.exit()
+
+        if sRQName == "계좌평가잔고내역요청":
+            total_buy_money = self.dynamicCall("GetCommData(String, String, int, String)", sTrCode, sRQName, 0, "총매입금액")
+            print("총 매입금액 : %s원" % format(int(total_buy_money), ","))
+
+            total_profit_loss_rate = self.dynamicCall("GetCommData(String, String, int, String)", sTrCode, sRQName, 0, "총수익률(%)")
+            print("총 수익률 : %s%%" % float(total_profit_loss_rate))
+
+            # Event Loop 동시성 처리
+            self.detail_account_info_event_loop_2.exit()
