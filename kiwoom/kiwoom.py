@@ -18,6 +18,10 @@ class Kiwoom(QAxWidget):
         self.user_name = None
         #############################
 
+        ######## 이벤트루프 모음
+        self.detail_account_info_event_loop = None
+        #############################
+
         self.get_ocx_instance()
         self.event_slots()
 
@@ -75,6 +79,10 @@ class Kiwoom(QAxWidget):
         # CommRqData("요청이름",  "TR번호",  "preNext",  "스크린번호")
         self.dynamicCall("CommRqData(String, String, int, String)","예수금상세현황요청","opw00001","0", "2000")
 
+        #Event Loop 동시성 처리
+        self.detail_account_info_event_loop =QEventLoop()
+        self.detail_account_info_event_loop.exec()
+
     def trdata_slot(self, sScrNo, sRQName, sTrCode, sRecordName, sPrevNext):
         '''
         tr 요청을 받는 구역, 슬롯.
@@ -92,3 +100,6 @@ class Kiwoom(QAxWidget):
 
             ok_deposit = self.dynamicCall("GetCommData(String, String, int, String)", sTrCode, sRQName, 0, "출금가능금액")
             print("출금가능금액 : %s원" % format(int(ok_deposit),","))
+
+            # Event Loop 동시성 처리
+            self.detail_account_info_event_loop.exit()
