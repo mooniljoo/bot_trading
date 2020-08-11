@@ -38,6 +38,6 @@ class Kiwoom(QAxWidget):
 
     # 로그인 에러 처리
     def login_slot(self, errCode):
-        print("errors "(errCode))
+        print(Exception(errCode))
 
         self.login_event_loop.exit()
