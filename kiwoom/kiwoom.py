@@ -25,6 +25,7 @@ class Kiwoom(QAxWidget):
         self.OnEventConnect.connect(self.login_slot)
 
     def login_slot(self, errCode):
+        # errCode가 0일 때 실행
         print(errCode)
 
         self.login_event_loop.exit()
@@ -35,3 +36,8 @@ class Kiwoom(QAxWidget):
         self.login_event_loop = QEventLoop()
         self.login_event_loop.exec_()
 
+    # 로그인 에러 처리
+    def login_slot(self, errCode):
+        print("errors "(errCode))
+
+        self.login_event_loop.exit()
