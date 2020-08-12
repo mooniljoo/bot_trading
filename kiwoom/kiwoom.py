@@ -10,8 +10,11 @@ class Kiwoom(QAxWidget):
 
         ######## eventloop 모듈
         self.login_next_loop = None
-        self.detail_account_info_event_loop = None
-        self.detail_account_info_event_loop_2 = None
+        self.detail_account_info_event_loop = QEventLoop()
+        #############################
+
+        ######## 스크린번호 모음
+        self.screen_my_info = "2000"
         #############################
 
         ######## 변수 모음
@@ -77,7 +80,7 @@ class Kiwoom(QAxWidget):
 
     def detail_account_info(self):
         # 예수금상세현황요청
-        print("---- 예수금을 요청하는 부분 ----")
+        print("---- 예수금 요청 ----")
         # Open API 조회 함수 입력값
         self.dynamicCall("SetInputValue(String, String)", "계좌번호", self.account_num)
         self.dynamicCall("SetInputValue(String, String)", "비밀번호", "0000")
@@ -85,25 +88,23 @@ class Kiwoom(QAxWidget):
         self.dynamicCall("SetInputValue(String, String)", "조회구분", "2")
         # Open API 조회 함수를 호출해서 전문을 서버로 전송
         # CommRqData("요청이름",  "TR번호",  "preNext",  "스크린번호")
-        self.dynamicCall("CommRqData(String, String, int, String)", "예수금상세현황요청", "opw00001", "0", "2000")
+        self.dynamicCall("CommRqData(String, String, int, String)", "예수금상세현황요청", "opw00001", "0", self.screen_my_info)
 
-        # Event Loop 동시성 처리
-        self.detail_account_info_event_loop = QEventLoop()
+        # Event Loop 실행
         self.detail_account_info_event_loop.exec()
 
     def detail_account_mystock(self, sPrevNext="0"):
         #계좌평가잔고내역요청
-        print("---- 계좌평가잔고내역을 요청하는 부분 ----")
+        print("---- 계좌평가잔고내역 요청 (페이지%s)----" % sPrevNext)
         self.dynamicCall("SetInputValue(String, String)", "계좌번호", self.account_num)
         self.dynamicCall("SetInputValue(String, String)", "비밀번호", "0000")
         self.dynamicCall("SetInputValue(String, String)", "비밀번호입력매체구분", "00")
         self.dynamicCall("SetInputValue(String, String)", "조회구분", "2")
         # Open API 조회 함수를 호출해서 전문을 서버로 전송
-        self.dynamicCall("CommRqData(String, String, int, String)", "계좌평가잔고내역요청", "opw00018", sPrevNext, "2000")
+        self.dynamicCall("CommRqData(String, String, int, String)", "계좌평가잔고내역요청", "opw00018", sPrevNext, self.screen_my_info)
 
-        # Event Loop 동시성 처리
-        self.detail_account_info_event_loop_2 = QEventLoop()
-        self.detail_account_info_event_loop_2.exec()
+        # Event Loop 실행
+        self.detail_account_info_event_loop.exec()
 
     def trdata_slot(self, sScrNo, sRQName, sTrCode, sRecordName, sPrevNext):
         '''
@@ -112,7 +113,7 @@ class Kiwoom(QAxWidget):
         :param sRQName: 내가 요청했을 때 지은 이름
         :param sTrCode: 요청 id, tr코드
         :param sRecordName: 사용안함
-        :param sPrevNext: 다음페이지가 있는지
+        :param sPrevNext: 다음페이지가 있는지 ( 한 prevNext당 최대 20개) 첫페이지는 0, 다음페이지는 2
         :return:
         '''
 
@@ -129,7 +130,7 @@ class Kiwoom(QAxWidget):
             ok_deposit = self.dynamicCall("GetCommData(String, String, int, String)", sTrCode, sRQName, 0, "출금가능금액")
             print("출금가능금액 : %s원" % format(int(ok_deposit),","))
 
-            # Event Loop 동시성 처리
+            # Event Loop 종료
             self.detail_account_info_event_loop.exit()
 
         if sRQName == "계좌평가잔고내역요청":
@@ -140,7 +141,7 @@ class Kiwoom(QAxWidget):
             print("총 수익률 : %s%%" % float(total_profit_loss_rate))
 
             # 보유 종목
-            # 종목 보유 갯수 확인
+            # 종목 보유 갯수 확인 (한 prevNext당 최대 20개)
             rows = self.dynamicCall("GetRepeatCnt(QString ,QString)", sTrCode, sRQName)
             # 0은 첫 번째 종목, 1은 두 번째 종목···
             cnt = 0
@@ -183,6 +184,8 @@ class Kiwoom(QAxWidget):
             print("보유 종목 수 : %s개" % cnt)
             print("보유 종목 : %s" % self.account_stock_dict)
 
-
-            # Event Loop 동시성 처리
-            self.detail_account_info_event_loop_2.exit()
+            if sPrevNext == "2":
+                self.detail_account_mystock(sPrevNext = "2")
+            else:
+                # Event Loop 종료
+                self.detail_account_info_event_loop.exit()
