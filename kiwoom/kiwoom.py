@@ -30,6 +30,7 @@ class Kiwoom(QAxWidget):
 
         ######## 변수 모음
         self.account_stock_dict = {}
+        self.not_account_stock_dict = {}
         #############################
 
         self.get_ocx_instance()
@@ -39,6 +40,7 @@ class Kiwoom(QAxWidget):
         self.get_account_info()
         self.detail_account_info() #예수금 요청
         self.detail_account_mystock() #보유종목 요청
+        self.not_concluded_account() #미체결 요청
 
     def get_ocx_instance(self):
         # 키움OpenAPI 프로그램 레지스트리 등록
@@ -105,6 +107,19 @@ class Kiwoom(QAxWidget):
 
         # Event Loop 실행
         self.detail_account_info_event_loop.exec()
+
+    def not_concluded_account(self, sPrevNext="0"):
+        # 미체결요청
+        print("---- 미체결요청 ----")
+        self.dynamicCall("SetInputValue(QString, QString)", "계좌번호", self.account_num)
+        self.dynamicCall("SetInputValue(QString, QString)", "체결구분", "1") # 1이 미체결
+        self.dynamicCall("SetInputValue(QString, QString)", "매매구분", "0") # 0은 매수,매도 전체
+        # Open API 조회 함수를 호출해서 전문을 서버로 전송
+        self.dynamicCall("CommRqData(QString, QString, int, QString)", "실시간미체결요청", "opw00075", sPrevNext, self.screen_my_info)
+
+        # Event Loop 실행
+        self.detail_account_info_event_loop.exec()
+
 
     def trdata_slot(self, sScrNo, sRQName, sTrCode, sRecordName, sPrevNext):
         '''
@@ -189,3 +204,47 @@ class Kiwoom(QAxWidget):
             else:
                 # Event Loop 종료
                 self.detail_account_info_event_loop.exit()
+
+        elif sRQName == "실시간미체결요청":
+
+            rows = self.dynamicCall("GetRepeatCnt(QString ,QString)", sTrCode, sRQName)
+
+            for i in range(rows):
+                code = self.dynamicCall("GetCommData(QString, QString, int, QString", sTrCode, sRQName, i, "종목번호")
+                code_name = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "종목명")
+                order_no = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "주문번호")
+                order_status = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "주문상태") # 접수, 확인, 체결
+                order_quantity = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "주문수량")
+                order_price = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "주문가격")
+                order_gubun = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "주문구분") # -매도, +매수, -매도정정, +매수정정
+                not_quantity = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "미체결수량")
+                ok_quantity = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i,"체결량")
+
+                code = code.strip()
+                code_name = code_name.strip()
+                order_no = int(order_no.strip())
+                order_status = order_status.strip()
+                order_quantity = int(order_quantity.strip())
+                order_price = int(order_price.strip())
+                order_gubun = order_gubun.strip().lstrip("+").lstrip("-")
+                not_quantity = int(not_quantity.strip())
+                ok_quantity = int(ok_quantity.strip())
+
+                if order_no in self.not_account_stock_dict:
+                    pass
+                else:
+                    self.not_account_stock_dict[order_no] = {}
+
+                self.not_account_stock_dict[order_no].update({"종목코드": code})
+                self.not_account_stock_dict[order_no].update({"종목명": code_name})
+                self.not_account_stock_dict[order_no].update({"주문번호": order_no})
+                self.not_account_stock_dict[order_no].update({"주문상태": order_status})
+                self.not_account_stock_dict[order_no].update({"주문수량": order_quantity})
+                self.not_account_stock_dict[order_no].update({"주문가격": order_price})
+                self.not_account_stock_dict[order_no].update({"주문구분": order_gubun})
+                self.not_account_stock_dict[order_no].update({"미체결수량": not_quantity})
+                self.not_account_stock_dict[order_no].update({"체결량": ok_quantity})
+
+                print("미체결 종목 : %s " % self.not_account_stock_dict[order_no])
+
+            self.detail_account_info_event_loop.exit()
