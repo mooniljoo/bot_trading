@@ -20,22 +20,13 @@ class Kiwoom(QAxWidget):
         self.user_name = None
         #############################
 
-        ######## 계좌 관련 변수
-        self.use_money = 0
-        self.use_money_percent = 0.5
-        #############################
-
-        ######## 변수 모음
-        self.account_stock_dict = {}
-        #############################
-
         self.get_ocx_instance()
         self.event_slots()
 
         self.signal_login_commConnect()
         self.get_account_info()
-        self.detail_account_info() #예수금 요청
-        self.detail_account_mystock() #보유종목 요청
+        self.detail_account_info()
+        self.detail_account_mystock()
 
     def get_ocx_instance(self):
         # 키움OpenAPI 프로그램 레지스트리 등록
@@ -46,7 +37,7 @@ class Kiwoom(QAxWidget):
         self.OnReceiveTrData.connect(self.trdata_slot)
 
     def login_slot(self, errCode):
-        # errCode 가 0일 때 실행
+        # errCode가 0일 때 실행
         print(errCode)
 
         self.login_event_loop.exit()
@@ -85,10 +76,10 @@ class Kiwoom(QAxWidget):
         self.dynamicCall("SetInputValue(String, String)", "조회구분", "2")
         # Open API 조회 함수를 호출해서 전문을 서버로 전송
         # CommRqData("요청이름",  "TR번호",  "preNext",  "스크린번호")
-        self.dynamicCall("CommRqData(String, String, int, String)", "예수금상세현황요청", "opw00001", "0", "2000")
+        self.dynamicCall("CommRqData(String, String, int, String)","예수금상세현황요청","opw00001","0", "2000")
 
-        # Event Loop 동시성 처리
-        self.detail_account_info_event_loop = QEventLoop()
+        #Event Loop 동시성 처리
+        self.detail_account_info_event_loop =QEventLoop()
         self.detail_account_info_event_loop.exec()
 
     def detail_account_mystock(self, sPrevNext="0"):
@@ -99,7 +90,7 @@ class Kiwoom(QAxWidget):
         self.dynamicCall("SetInputValue(String, String)", "비밀번호입력매체구분", "00")
         self.dynamicCall("SetInputValue(String, String)", "조회구분", "2")
         # Open API 조회 함수를 호출해서 전문을 서버로 전송
-        self.dynamicCall("CommRqData(String, String, int, String)", "계좌평가잔고내역요청", "opw00018", sPrevNext, "2000")
+        self.dynamicCall("CommRqData(String, String, int, String)","계좌평가잔고내역요청","opw00018",sPrevNext, "2000")
 
         # Event Loop 동시성 처리
         self.detail_account_info_event_loop_2 = QEventLoop()
@@ -120,12 +111,6 @@ class Kiwoom(QAxWidget):
             deposit = self.dynamicCall("GetCommData(String, String, int, String)", sTrCode, sRQName, 0, "예수금")
             print("예수금 : %s원" % format(int(deposit),","))
 
-            #한 종목 구입랼
-            self.use_money = int(deposit) * self.use_money_percent
-            self.use_money = self.use_money / 4
-
-
-
             ok_deposit = self.dynamicCall("GetCommData(String, String, int, String)", sTrCode, sRQName, 0, "출금가능금액")
             print("출금가능금액 : %s원" % format(int(ok_deposit),","))
 
@@ -138,51 +123,6 @@ class Kiwoom(QAxWidget):
 
             total_profit_loss_rate = self.dynamicCall("GetCommData(String, String, int, String)", sTrCode, sRQName, 0, "총수익률(%)")
             print("총 수익률 : %s%%" % float(total_profit_loss_rate))
-
-            # 보유 종목
-            # 종목 보유 갯수 확인
-            rows = self.dynamicCall("GetRepeatCnt(QString ,QString)", sTrCode, sRQName)
-            # 0은 첫 번째 종목, 1은 두 번째 종목···
-            cnt = 0
-            for i in range(rows):
-                # A:장내주식, J:ELW종목, Q:ETN종목
-                code = self.dynamicCall("GetCommData(QString, QString, int, QString", sTrCode, sRQName, i, "종목번호")
-                code = code.strip()[1:]
-
-                code_name = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i,"종목명")
-                stock_quantity = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "보유수량")
-                buy_price = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "매입가")
-                learn_rate = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "수익률(%)")
-                current_price = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "현재가")
-                total_chegual_price = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "매입금액")
-                possible_quantity = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "매매가능수량")
-
-                if code in self.account_stock_dict:
-                    pass
-                else:
-                    self.account_stock_dict.update({code:{}})
-
-                code_name = code_name.strip()
-                stock_quantity = int(stock_quantity.strip())
-                buy_price = int(buy_price.strip())
-                learn_rate = float(learn_rate.strip())
-                current_price = int(current_price.strip())
-                total_chegual_price = int(total_chegual_price.strip())
-                possible_quantity = int(possible_quantity)
-
-                self.account_stock_dict[code].update({"종목명": code_name})
-                self.account_stock_dict[code].update({"보유수량": stock_quantity})
-                self.account_stock_dict[code].update({"매입가": buy_price})
-                self.account_stock_dict[code].update({"수익률(%)": learn_rate})
-                self.account_stock_dict[code].update({"현재가": current_price})
-                self.account_stock_dict[code].update({"매입금액": total_chegual_price})
-                self.account_stock_dict[code].update({"매매가능수량": possible_quantity})
-
-                cnt += 1
-
-            print("보유 종목 수 : %s개" % cnt)
-            print("보유 종목 : %s" % self.account_stock_dict)
-
 
             # Event Loop 동시성 처리
             self.detail_account_info_event_loop_2.exit()
