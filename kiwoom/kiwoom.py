@@ -15,6 +15,7 @@ class Kiwoom(QAxWidget):
 
         ######## 스크린번호 모음
         self.screen_my_info = "2000"
+        self.screen_calculation_stock = "4000"
         #############################
 
         ######## 변수 모음
@@ -40,7 +41,9 @@ class Kiwoom(QAxWidget):
         self.get_account_info()
         self.detail_account_info() #예수금 요청
         self.detail_account_mystock() #보유종목 요청
-        self.not_concluded_account() #미체결 요청
+        # self.not_concluded_account() #미체결 요청
+
+        self.caclulator_fnc() # 종목분석용, 임시 실행용
 
     def get_ocx_instance(self):
         # 키움OpenAPI 프로그램 레지스트리 등록
@@ -248,3 +251,35 @@ class Kiwoom(QAxWidget):
                 print("미체결 종목 : %s " % self.not_account_stock_dict[order_no])
 
             self.detail_account_info_event_loop.exit()
+
+    def get_code_list_by_market(self, market_code):
+        '''
+        종목코드들 반환
+        :param market_code:
+        :return:
+        '''
+        code_list = self.dynamicCall("GetCodeListByMarket(QString)", market_code)
+        code_list = code_list.split(":")[:-1]
+
+        return code_list
+
+    def caclulator_fnc(self):
+        '''
+        종목 분석 실행용 함수
+        :return:
+        '''
+        # 장내 : 0, 코스닥 : 10, ETF:8
+        code_list = self.get_code_list_by_market("10")
+        print("코스닥 종목 개수  %s개" % len(code_list))
+
+    def day_kiwoom_db(self, code=None, date=None, sPrevNext="0"):
+
+        print("---- 일봉 요청 ----")
+        self.dynamicCall("SetInputValue(QString, QString)", "종목코드", code)
+        self.dynamicCall("SetInputValue(QString, QString)", "수정주가구분", "1")
+
+        if date != None:
+            self.dynamicCall("SetInputValue(QString, QString)","기준일자",date)
+
+        # Open API 조회 함수를 호출해서 전문을 서버로 전송
+        self.dynamicCall("CommRqData(QString, QString, int, QString)", "주식일봉차트조회", "opw10081", sPrevNext, self.screen_calculation_stock)
