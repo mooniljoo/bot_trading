@@ -9,7 +9,7 @@ class Kiwoom(QAxWidget):
         print("Kiwoom 클래스입니다.")
 
         ######## eventloop 모듈
-        self.login_next_loop = None
+        self.login_event_loop = None
         self.detail_account_info_event_loop = QEventLoop()
         #############################
 
@@ -41,7 +41,7 @@ class Kiwoom(QAxWidget):
         self.get_account_info()
         self.detail_account_info() #예수금 요청
         self.detail_account_mystock() #보유종목 요청
-        # self.not_concluded_account() #미체결 요청
+        self.not_concluded_account() #미체결 요청
 
         self.caclulator_fnc() # 종목분석용, 임시 실행용
 
@@ -118,7 +118,7 @@ class Kiwoom(QAxWidget):
         self.dynamicCall("SetInputValue(QString, QString)", "체결구분", "1") # 1이 미체결
         self.dynamicCall("SetInputValue(QString, QString)", "매매구분", "0") # 0은 매수,매도 전체
         # Open API 조회 함수를 호출해서 전문을 서버로 전송
-        self.dynamicCall("CommRqData(QString, QString, int, QString)", "실시간미체결요청", "opw00075", sPrevNext, self.screen_my_info)
+        self.dynamicCall("CommRqData(QString, QString, int, QString)", "실시간미체결요청", "opt10075", sPrevNext, self.screen_my_info)
 
         # Event Loop 실행
         self.detail_account_info_event_loop.exec()
@@ -213,7 +213,7 @@ class Kiwoom(QAxWidget):
             rows = self.dynamicCall("GetRepeatCnt(QString ,QString)", sTrCode, sRQName)
 
             for i in range(rows):
-                code = self.dynamicCall("GetCommData(QString, QString, int, QString", sTrCode, sRQName, i, "종목번호")
+                code = self.dynamicCall("GetCommData(QString, QString, int, QString", sTrCode, sRQName, i, "종목코드")
                 code_name = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "종목명")
                 order_no = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "주문번호")
                 order_status = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, i, "주문상태") # 접수, 확인, 체결
@@ -259,7 +259,7 @@ class Kiwoom(QAxWidget):
         :return:
         '''
         code_list = self.dynamicCall("GetCodeListByMarket(QString)", market_code)
-        code_list = code_list.split(":")[:-1]
+        code_list = code_list.split(";")[:-1]
 
         return code_list
 
@@ -282,4 +282,4 @@ class Kiwoom(QAxWidget):
             self.dynamicCall("SetInputValue(QString, QString)","기준일자",date)
 
         # Open API 조회 함수를 호출해서 전문을 서버로 전송
-        self.dynamicCall("CommRqData(QString, QString, int, QString)", "주식일봉차트조회", "opw10081", sPrevNext, self.screen_calculation_stock)
+        self.dynamicCall("CommRqData(QString, QString, int, QString)", "주식일봉차트조회", "opt10081", sPrevNext, self.screen_calculation_stock)
