@@ -1,5 +1,8 @@
 from PyQt5.QAxContainer import *
 from PyQt5.QtCore import *
+from PyQt5.QtTest import *
+
+from config.errCode import *
 
 
 class Kiwoom(QAxWidget):
@@ -11,6 +14,7 @@ class Kiwoom(QAxWidget):
         ######## eventloop 모듈
         self.login_event_loop = None
         self.detail_account_info_event_loop = QEventLoop()
+        self.calculator_event_loop = QEventLoop()
         #############################
 
         ######## 스크린번호 모음
@@ -32,6 +36,10 @@ class Kiwoom(QAxWidget):
         ######## 변수 모음
         self.account_stock_dict = {}
         self.not_account_stock_dict = {}
+        #############################
+
+        ######## 변수 모음
+        self.calcul_data = []
         #############################
 
         self.get_ocx_instance()
@@ -252,6 +260,54 @@ class Kiwoom(QAxWidget):
 
             self.detail_account_info_event_loop.exit()
 
+        if sRQName == "주식일봉차트조회":
+
+            code = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, 0, "종목코드")
+            code = code.strip()
+            print("%s 일봉데이터 요청" % code)
+
+            cnt = self.dynamicCall("GetRepeatCnt(QString, QString)", sTrCode, sRQName)
+            print("데이터 일 수 : %s일" % cnt)
+
+            # data = self.dynamicCall("GetCommData(QString, QString, int, QString", sTrCode, sRQName, i, "현재가")
+            # [['','현재가','거래량','거래대금','일자','시가','고가','저가',''],['','현재가','거래량','거래대금','일자','시가','고가','저가',''],...]
+
+            # 한 번 조회에 600일치 일봉데이터 수신
+            for i in range(cnt):
+                data = []
+
+                current_price = self.dynamicCall("GetCommData(QString, QString, int, QString", sTrCode, sRQName, i, "현재가")
+                value = self.dynamicCall("GetCommData(QString, QString, int, QString", sTrCode, sRQName, i, "거래량")
+                trading_value = self.dynamicCall("GetCommData(QString, QString, int, QString", sTrCode, sRQName, i, "거래대금")
+                date = self.dynamicCall("GetCommData(QString, QString, int, QString", sTrCode, sRQName, i, "일자")
+                start_price = self.dynamicCall("GetCommData(QString, QString, int, QString", sTrCode, sRQName, i, "시가")
+                high_price = self.dynamicCall("GetCommData(QString, QString, int, QString", sTrCode, sRQName, i, "고가")
+                low_price = self.dynamicCall("GetCommData(QString, QString, int, QString", sTrCode, sRQName, i, "저가")
+
+                data.append("")
+                data.append(current_price.strip())
+                data.append(value.strip())
+                data.append(trading_value.strip())
+                data.append(date.strip())
+                data.append(start_price.strip())
+                data.append(high_price.strip())
+                data.append(low_price.strip())
+                data.append("")
+
+                self.calcul_data.append(data.copy())
+
+            print(len(self.calcul_data))
+
+            if sPrevNext == "2":
+                self.day_kiwoom_db(code=code, sPrevNext=sPrevNext)
+            else:
+
+                print("총 일수 %s" % len(self.calcul_data))
+
+                self.calculator_event_loop.exit()
+
+
+
     def get_code_list_by_market(self, market_code):
         '''
         종목코드들 반환
@@ -272,7 +328,20 @@ class Kiwoom(QAxWidget):
         code_list = self.get_code_list_by_market("10")
         print("코스닥 종목 개수  %s개" % len(code_list))
 
+        for idx, code in enumerate(code_list):
+            # 스크린번호 끊기, 스크린번호를 한 번이라도 요청하면 그 그룹이 만들어진 것. 끊지 않으면 덮어쓰기 됨
+            self.dynamicCall("DisconnectRealdata(QString)",self.screen_calculation_stock)
+
+            print("%s / %s : KOSDAQ Stock Code : %s is updating..." % (idx+1, len(code_list), code))
+
+            self.day_kiwoom_db(code=code)
+
+
+
     def day_kiwoom_db(self, code=None, date=None, sPrevNext="0"):
+        
+        # 반복문을 돌리면 튕기므로 임의로 딜레이를 준다.
+        QTest.qWait(3600)
 
         print("---- 일봉 요청 ----")
         self.dynamicCall("SetInputValue(QString, QString)", "종목코드", code)
@@ -283,3 +352,5 @@ class Kiwoom(QAxWidget):
 
         # Open API 조회 함수를 호출해서 전문을 서버로 전송
         self.dynamicCall("CommRqData(QString, QString, int, QString)", "주식일봉차트조회", "opt10081", sPrevNext, self.screen_calculation_stock)
+
+        self.calculator_event_loop.exec_()
