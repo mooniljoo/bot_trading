@@ -1,3 +1,5 @@
+import os
+
 from PyQt5.QAxContainer import *
 from PyQt5.QtCore import *
 from PyQt5.QtTest import *
@@ -20,9 +22,13 @@ class Kiwoom(QAxWidget):
         ######## 스크린번호 모음
         self.screen_my_info = "2000"
         self.screen_calculation_stock = "4000"
+        self.screen_real_stock = "5000" # 종목별로 할당할 스크린 번호
+        self.screen_meme_stock = "6000" #종목별 할당할 주문용스크린 번호
+        self.screen_start_stop_real = "1000" #장 시작/종료 실시간 스크린번호
         #############################
 
         ######## 변수 모음
+        self.portfolio_stock_dict = {}
         self.account_num = None
         self.user_id = None
         self.user_name = None
@@ -51,7 +57,9 @@ class Kiwoom(QAxWidget):
         self.detail_account_mystock() #보유종목 요청
         self.not_concluded_account() #미체결 요청
 
-        self.caclulator_fnc() # 종목분석용, 임시 실행용
+        # self.caclulator_fnc() # 종목분석용, 임시 실행용
+        self.read_code() #저장된 종목 불러오기
+        self.screen_number_setting()
 
     def get_ocx_instance(self):
         # 키움OpenAPI 프로그램 레지스트리 등록
@@ -424,3 +432,75 @@ class Kiwoom(QAxWidget):
         self.dynamicCall("CommRqData(QString, QString, int, QString)", "주식일봉차트조회", "opt10081", sPrevNext, self.screen_calculation_stock)
 
         self.calculator_event_loop.exec_()
+
+    # 매수법칙 계산 들어가면 됨
+
+    def read_code(self):
+        # 저장된 종목코드 읽어오기
+        if os.path.exists("files/condition_stock.txt"):  # 해당 경로에 파일이 있는지 체크한다.
+            f = open("files/condition_stock.txt", "r", encoding="utf8")  # "r"을 인자로 던져주면 파일 내용을 읽어 오겠다는 뜻이다.
+
+            lines = f.readlines()  # 파일에 있는 내용들을 모두 읽어온다.
+            for line in lines:  # 줄바꿈된 내용들을 한 줄씩 읽어온다.
+                if line != "":
+                    ls = line.split("\t") # [종목코드, 종목명, 현재가]
+                    stock_code = ls[0]
+                    stock_name = ls[1]
+                    stock_price = int(ls[2].split("\n")[0])
+                    stock_price = abs(stock_price) # 절대값
+
+                    self.portfolio_stock_dict.update({stock_code: {"종목명": stock_name, "현재가": stock_price}})
+
+            f.close()
+            print(self.portfolio_stock_dict)
+
+    def screen_number_setting(self):
+
+        # 종목들 모으기
+        screen_overwrite = []
+
+        # 계좌평가잔고내역에 있는 종목들
+        for code in self.account_stock_dict.keys():
+            if code not in screen_overwrite:
+                screen_overwrite.append(code)
+
+        # 미체결에 있는 종목들
+        for order_number in self.not_account_stock_dict.keys():
+            code = self.not_account_stock_dict[order_number]['종목코드']
+
+            if code not in screen_overwrite:
+                screen_overwrite.append(code)
+
+        # 포트폴리로에 담겨있는 종목들
+        for code in self.portfolio_stock_dict.keys():
+
+            if code not in screen_overwrite:
+                screen_overwrite.append(code)
+
+        # 스크린번호 할당
+        cnt = 0
+        for code in screen_overwrite:
+
+            temp_screen = int(self.screen_real_stock)
+            meme_screen = int(self.screen_meme_stock)
+
+            # 스크린 하나당 종목코드 50개씩만 할당하겠다. 스크린번호 최대는 100개
+            if (cnt % 50) == 0:
+                temp_screen += 1
+                self.screen_real_stock = str(temp_screen)
+
+            if (cnt % 50) == 0:
+                meme_screen += 1
+                self.screen_meme_stock = str(meme_screen)
+
+            if code in self.portfolio_stock_dict.keys():
+                self.portfolio_stock_dict[code].update({"스크린번호": str(self.screen_real_stock)})
+                self.portfolio_stock_dict[code].update({"주문용스크린번호": str(self.screen_meme_stock)})
+
+            elif code not in self.portfolio_stock_dict.keys():
+                self.portfolio_stock_dict.update(
+                    {code: {"스크린번호": str(self.screen_real_stock), "주문용스크린번호": str(self.screen_meme_stock)}})
+
+            cnt += 1
+
+        print(self.portfolio_stock_dict)
