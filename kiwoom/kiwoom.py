@@ -1,15 +1,16 @@
 import os
-
+import sys
 from PyQt5.QAxContainer import *
 from PyQt5.QtCore import *
-from PyQt5.QtTest import *
-
 from config.errCode import *
+from PyQt5.QtTest import *
+from config.kiwoomType import *
 
 
 class Kiwoom(QAxWidget):
     def __init__(self):
         super().__init__()
+        self.realType = RealType()
 
         print("Kiwoom 클래스입니다.")
 
@@ -50,6 +51,7 @@ class Kiwoom(QAxWidget):
 
         self.get_ocx_instance()
         self.event_slots()
+        self.real_event_slot()
 
         self.signal_login_commConnect()
         self.get_account_info()
@@ -59,7 +61,17 @@ class Kiwoom(QAxWidget):
 
         # self.caclulator_fnc() # 종목분석용, 임시 실행용
         self.read_code() #저장된 종목 불러오기
-        self.screen_number_setting()
+        self.screen_number_setting() #스크린 번호를 할당
+
+        # 실시간 수신 관련 함수
+        # 처음 시간을 받을때는 덮어쓰는 0, 실시간으로 등록할때는 1
+        self.dynamicCall("SetRealReg(QString, QString, QString, QString)", self.screen_start_stop_real, '', self.realType.REALTYPE['장시작시간']['장운영구분'], "0")
+
+        for code in self.portfolio_stock_dict.keys():
+            screen_num = self.portfolio_stock_dict[code]['스크린번호']
+            fids = self.realType.REALTYPE['주식체결']['체결시간']
+            self.dynamicCall("SetRealReg(QString, QString, QString, QString)", screen_num, code, fids, "1")
+            print("실시간 등록 코드 :  %s, 스크린번호 : %s, 번호 : %s " % (code, screen_num, fids))
 
     def get_ocx_instance(self):
         # 키움OpenAPI 프로그램 레지스트리 등록
@@ -68,6 +80,9 @@ class Kiwoom(QAxWidget):
     def event_slots(self):
         self.OnEventConnect.connect(self.login_slot)
         self.OnReceiveTrData.connect(self.trdata_slot)
+
+    def real_event_slot(self):
+        self.OnReceiveRealData.connect(self.realdata_slot)  # 실시간 이벤트 연결
 
     def login_slot(self, errCode):
         # errCode 가 0일 때 실행
@@ -504,3 +519,34 @@ class Kiwoom(QAxWidget):
             cnt += 1
 
         print(self.portfolio_stock_dict)
+
+    def realdata_slot(self, sCode, sRealType, sRealData):
+
+        if sRealType == "장시작시간":
+            fid = self.realType.REALTYPE[sRealType]['장운영구분']  # (0:장시작전, 2:장종료전(20분), 3:장시작, 4,8:장종료(30분), 9:장마감)
+            value = self.dynamicCall("GetCommRealData(QString, int)", sCode, fid)
+
+            if value == '0':
+                print("장 시작 전")
+
+            elif value == '3':
+                print("장 시작")
+
+            elif value == "2":
+                print("장 종료, 동시호가로 넘어감")
+
+            elif value == "4":
+                print("3시30분 장 종료")
+
+                for code in self.portfolio_stock_dict.keys():
+                    self.dynamicCall("SetRealRemove(QString, QString)", self.portfolio_stock_dict[code]['스크린번호'], code)
+
+                # QTest.qWait(5000)
+                #
+                # self.file_delete()
+                # self.calculator_fnc()
+                #
+                # sys.exit()
+
+        elif sRealType == "주식체결":
+            print(sRealData)
